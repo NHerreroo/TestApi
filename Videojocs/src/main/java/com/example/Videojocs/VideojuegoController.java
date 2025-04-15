@@ -1,14 +1,28 @@
 package com.example.Videojocs;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.fge.jsonpatch.JsonPatch;
+import com.github.fge.jsonpatch.JsonPatchException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/videojuegos")
 public class VideojuegoController {
+
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private final VideojuegoService videojuegoService;
 
@@ -32,17 +46,24 @@ public class VideojuegoController {
 
     // GET: Devuelve solo el estudio de un videojuego
     @GetMapping("/{id}/estudio")
-    public ResponseEntity<String> obtenerEstudio(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> obtenerEstudio(@PathVariable Long id) {
         Optional<Videojuego> videojuego = videojuegoService.obtenerPorId(id);
-        return videojuego.map(v -> ResponseEntity.ok(v.getEstudio()))
+        return videojuego
+                .map(v -> {
+                    Map<String, String> response = new HashMap<>();
+                    response.put("estudio", v.getEstudio());
+                    return ResponseEntity.ok(response);
+                })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
+
 
     // POST: Crea un videojuego
     @PostMapping
     public Videojuego agregar(@RequestBody Videojuego videojuego) {
         return videojuegoService.guardar(videojuego);
     }
+
 
     // DELETE: Elimina un videojuego por ID
     @DeleteMapping("/{id}")
@@ -68,16 +89,25 @@ public class VideojuegoController {
         }).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // PATCH: Ejemplo de modificación masiva (subir el PEGI en +1 a todos los videojuegos)
-    @PatchMapping
-    public ResponseEntity<Void> incrementarPegi() {
-        List<Videojuego> videojuegos = videojuegoService.obtenerTodos();
-        for (Videojuego v : videojuegos) {
-            if (v.getPegi() < 18) { // PEGI máximo es 18
-                v.setPegi(v.getPegi() + 1);
-                videojuegoService.guardar(v);
-            }
+
+
+    @PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
+    public ResponseEntity<Videojuego> patchVideojuego(@PathVariable String id, @RequestBody JsonPatch patch) {
+        try {
+            Optional<Videojuego> original = videojuegoService.obtenerPorId(Long.valueOf(id));
+            Videojuego patched = applyPatchToVideojuego(patch, original);
+            videojuegoService.guardar(patched);
+            return ResponseEntity.ok(patched);
+        } catch (JsonPatchException | JsonProcessingException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok().build();
+    }
+
+    private Videojuego applyPatchToVideojuego(JsonPatch patch, Optional<Videojuego> targetVideojuego)
+            throws JsonPatchException, JsonProcessingException {
+        JsonNode patched = patch.apply(objectMapper.convertValue(targetVideojuego, JsonNode.class));
+        return objectMapper.treeToValue(patched, Videojuego.class);
     }
 }

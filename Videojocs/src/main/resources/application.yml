@@ -1,16 +1,11 @@
 spring:
-  application:
-    name: Videojocs
   datasource:
-    url: jdbc:mysql://localhost:3306/videojocs
+    url: jdbc:mariadb://localhost:3306/videojocs
     username: root
     password:
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.mariadb.jdbc.Driver
   jpa:
     database-platform: org.hibernate.dialect.MariaDBDialect
     hibernate:
       ddl-auto: update
     show-sql: true
-  sql:
-    init:
-      mode: always
