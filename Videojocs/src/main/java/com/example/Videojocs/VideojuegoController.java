@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/v1/videojuegos")
+    @RequestMapping("/api/v1/videojuegos")
 public class VideojuegoController {
 
 
@@ -92,22 +92,24 @@ public class VideojuegoController {
 
 
     @PatchMapping(value = "/{id}", consumes = "application/json-patch+json")
-    public ResponseEntity<Videojuego> patchVideojuego(@PathVariable String id, @RequestBody JsonPatch patch) {
-        try {
-            Optional<Videojuego> original = videojuegoService.obtenerPorId(Long.valueOf(id));
-            Videojuego patched = applyPatchToVideojuego(patch, original);
-            videojuegoService.guardar(patched);
-            return ResponseEntity.ok(patched);
-        } catch (JsonPatchException | JsonProcessingException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<Videojuego> patchVideojuego(@PathVariable Long id, @RequestBody JsonPatch patch) {
+        return (ResponseEntity<Videojuego>) videojuegoService.obtenerPorId(id)
+                .map(original -> {
+                    try {
+                        Videojuego patched = applyPatchToVideojuego(patch, original);
+                        videojuegoService.guardar(patched);
+                        return ResponseEntity.ok(patched);
+                    } catch (JsonPatchException | JsonProcessingException e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+                    }
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private Videojuego applyPatchToVideojuego(JsonPatch patch, Optional<Videojuego> targetVideojuego)
+    private Videojuego applyPatchToVideojuego(JsonPatch patch, Videojuego targetVideojuego)
             throws JsonPatchException, JsonProcessingException {
         JsonNode patched = patch.apply(objectMapper.convertValue(targetVideojuego, JsonNode.class));
         return objectMapper.treeToValue(patched, Videojuego.class);
     }
+
 }
